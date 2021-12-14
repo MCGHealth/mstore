@@ -136,6 +136,33 @@ func Set(data []byte) ([]byte, error) {
 	return key, nil
 }
 
+// SetWithTTL allows an item to be saved to the database, yet only exist
+// for the time set in the TTL. This allows for caching operations where
+// a cached item is only valid for a certain period of time.
+func SetWithTTL(data []byte, ttl time.Duration) ([]byte, error) {
+	if !isOpen {
+		return nil, errors.New("the storage is not open")
+	}
+
+	key, err := GenPK(data)
+	if err != nil {
+		return nil, err
+	}
+
+	txn := db.NewTransaction(true)
+	entry := badger.NewEntry(key, data).WithTTL(ttl)
+	if err := txn.SetEntry(entry); err != nil {
+		txn.Discard()
+		return nil, err
+	}
+
+	if err := txn.Commit(); err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
 // Get retrieves the value from the data store.
 func Get(key []byte) ([]byte, error) {
 	if !isOpen {
@@ -166,7 +193,6 @@ func Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	return value, nil
-
 }
 
 func GetBatch() (me map[string][]byte, err error) {
