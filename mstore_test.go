@@ -9,6 +9,7 @@ import (
 
 	"github.com/MCGHealth/mstore"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testObj struct {
@@ -63,6 +64,7 @@ func TestStorage(t *testing.T) {
 	t.Run("Test Initialize while open", testInitWhileOpenReturnsError)
 	t.Run("Test Initialize Diskless Mode", testInitDisklessMode)
 	t.Run("Test Set and Get", testSetAndGet)
+	t.Run("Test Set with TTL", testSetWithTTL)
 	t.Run("Test Set Duplicate", testSetDupe)
 	t.Run("Test Set and Remove", testSetAndRemove)
 	t.Run("Test Get and Remove Batch", testGetAndRemoveBatch)
@@ -136,6 +138,32 @@ func testSetAndGet(t *testing.T) {
 	data5, err := mstore.Get(noValue)
 	assert.Error(t, err)
 	assert.Nil(t, data5)
+}
+
+func testSetWithTTL(t *testing.T) {
+	assert.True(t, mstore.IsOpen())
+	oneSecond := 1 * time.Second
+	obj1 := testStruct()
+	data1, _ := mstore.Marshal(obj1)
+	key, err := mstore.SetWithTTL(data1, 1*oneSecond)
+	require.NoError(t, err)
+	require.Len(t, key, 16)
+
+	// give time for the entry to expire
+	time.Sleep(1100 * time.Millisecond)
+
+	_, err = mstore.Get(key)
+	require.Error(t, err)
+
+	obj2 := testStruct()
+	data2, _ := mstore.Marshal(obj2)
+	key2, err := mstore.SetWithTTL(data2, 1*time.Minute)
+	require.NoError(t, err)
+	require.Len(t, key2, 16)
+
+	data3, err := mstore.Get(key2)
+	require.NoError(t, err)
+	require.NotEmpty(t,data3)
 }
 
 func testSetDupe(t *testing.T) {
